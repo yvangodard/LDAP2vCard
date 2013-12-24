@@ -1,23 +1,23 @@
 #! /bin/bash
 #-----------------------------------------
-#          	  LDAP2vCard
+#          	   LDAP2vCard
 #
-#       Exporte les coordonnées des 
-#   utilisateurs d'une branche LDAP vers 
+#      Exporte contact informations 
+#     from LDAP branch to vCard file
 #          un fichier vCard 3
 #
 #             Yvan Godard 
 #        godardyvan@gmail.com
 #
-#	Version 0.1 -- decemeber, 23 2013
+#	Version α 0.1 -- decemeber, 24 2013
 #         Tool licenced under 
 #   Creative Commons 4.0 BY NC SA
 #
-#         http://goo.gl/lriKvn
+#         http://goo.gl/i3gpVV
 #-----------------------------------------
 
 # Variables initialisation
-VERSION="LDAP2vCard v0.1 -- 2013 -- "
+VERSION="LDAP2vCard v0.1 -- 2013 -- http://goo.gl/i3gpVV"
 help="no"
 SCRIPT_DIR=$(dirname $0)
 SCRIPT_NAME=$(basename $0)
@@ -348,17 +348,14 @@ cat ${LIST_USERS_CLEAN} | perl -p -e 's/\n/ - /g' | awk 'sub( "...$", "" )'
 for USER in $(cat ${LIST_USERS_CLEAN})
 do
 	CONTENT_USER=$(mktemp /tmp/LDAP2vCard_user_content.XXXXX)
-	CONTENT_USER2=$(mktemp /tmp/LDAP2vCard_user_content2.XXXXX)
 	${LDAP_COMMAND_BEGIN} -b ${LDAP_DN_USER_BRANCH},${LDAP_DN_BASE} -x uid=${USER} uid uidNumber givenName sn cn apple-company departmentNumber title street postalCode l c telephoneNumber facsimileTelephoneNumber homePhone mobile pager apple-imhandle mail > ${CONTENT_USER}
-	cat ${CONTENT_USER} | perl -p -e 's/\n //g' >> ${CONTENT_USER2}
 	OLDIFS=$IFS; IFS=$'\n'
-	for LINE in $(cat ${CONTENT_USER2})
+	for LINE in $(cat ${CONTENT_USER})
 	do
 		base64decode $LINE >> ${DIR_TEMP_USERS}/${USER}
 	done
 	IFS=$OLDIFS
 	rm ${CONTENT_USER}
-	rm ${CONTENT_USER2}
 done
 
 # Add group informations
@@ -472,7 +469,6 @@ done
 
 echo ""
 
-echo "****************************** FINAL RESULT ******************************"
-echo -e "${SCRIPT_NAME} finished"
+echo "****************************** ${SCRIPT_NAME} finished ******************************"
 
 alldone 0
