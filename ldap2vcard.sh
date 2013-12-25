@@ -4,7 +4,6 @@
 #
 #      Exporte contact informations 
 #     from LDAP branch to vCard file
-#          un fichier vCard 3
 #
 #             Yvan Godard 
 #        godardyvan@gmail.com
@@ -17,7 +16,7 @@
 #-----------------------------------------
 
 # Variables initialisation
-VERSION="LDAP2vCard v0.1 -- 2013 -- http://goo.gl/i3gpVV"
+VERSION="LDAP2vCard α 0.1 -- 2013 -- http://goo.gl/i3gpVV"
 help="no"
 SCRIPT_DIR=$(dirname $0)
 SCRIPT_NAME=$(basename $0)
@@ -112,7 +111,7 @@ mkdir -p ${DIR_TEMP_USERS}
 optsCount=0
 optsCount_limit_groups=0
 
-while getopts "hd:a:p:t:g:s:u:D:G:e:E:j:" OPTION
+while getopts "hd:a:p:t:g:s:u:D:G:P:e:E:j:" OPTION
 do
 	case "$OPTION" in
 		h)	help="yes"
@@ -273,10 +272,10 @@ if [[ ${GROUP_LIMIT} = "0" ]]
 fi
 
 # Test bind to ${LDAP_GROUP_DN},${LDAP_DN_BASE}
-${LDAP_COMMAND_BEGIN} -b ${LDAP_GROUP_DN},${LDAP_DN_BASE} > /dev/null 2>&1
-if [ $? -ne 0 ]
-	then 
-	error "Error binding to LDAP server at ${LDAP_GROUP_DN},${LDAP_DN_BASE}.\nPlease verify your URL and user/pass."
+if [[ ${GROUP_LIMIT} != "0" ]]
+	then
+	${LDAP_COMMAND_BEGIN} -b ${LDAP_GROUP_DN},${LDAP_DN_BASE} > /dev/null 2>&1
+	[ $? -ne 0 ] && error "Error binding to LDAP server at ${LDAP_GROUP_DN},${LDAP_DN_BASE}.\nPlease verify your URL and user/pass."
 fi
 
 # Export user list : all users registered in some groups
@@ -309,11 +308,11 @@ if [[ ${GROUP_LIMIT} != "0" ]]
 	elif [[ ${LDAP_GROUP_OBJECTCLASS} = "groupOfNames" ]] 
 		then
 		echo -e "-> Processing group '${GROUP}'"
-		if [[ -z $(${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} member | grep member: | awk '{print $2}' | awk -F',' '{print $1}') ]] 
+		if [[ -z $(${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} member | grep member: | awk '{print $2}' | awk -F',' '{print $1}' | awk -F'=' '{print $2}') ]] 
 			then 
 			echo -e "\tUser list on LDAP group is empty"
 		else
-			${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} member | grep member: | awk '{print $2}' | awk -F',' '{print $1}' >> ${CONTENT_GROUP}
+			${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} member | grep member: | awk '{print $2}' | awk -F',' '{print $1}' | awk -F'=' '{print $2}' >> ${CONTENT_GROUP}
 		fi
 	elif [[ ${LDAP_GROUP_OBJECTCLASS} = "posixGroup" ]]
 		then
@@ -349,6 +348,7 @@ for USER in $(cat ${LIST_USERS_CLEAN})
 do
 	CONTENT_USER=$(mktemp /tmp/LDAP2vCard_user_content.XXXXX)
 	${LDAP_COMMAND_BEGIN} -b ${LDAP_DN_USER_BRANCH},${LDAP_DN_BASE} -x uid=${USER} uid uidNumber givenName sn cn apple-company departmentNumber title street postalCode l c telephoneNumber facsimileTelephoneNumber homePhone mobile pager apple-imhandle mail > ${CONTENT_USER}
+	[ $? -ne 0 ] && echo -e "Error while exporting user ${USER}. Please verify vCard result."
 	OLDIFS=$IFS; IFS=$'\n'
 	for LINE in $(cat ${CONTENT_USER})
 	do
@@ -430,7 +430,7 @@ do
     fi
     rm ${LIST_EMAILS_ADDRESS}
     rm ${SECONDARY_EMAILS}
-    # Precessing phone numbers
+    # Processing phone numbers
 	OLDIFS=$IFS; IFS=$'\n'
 	for telephoneNumber in $(cat ${FILE} | grep ^telephoneNumber: | perl -p -e 's/telephoneNumber: //g')
 	do
@@ -438,7 +438,7 @@ do
 	done
 	for facsimileTelephoneNumber in $(cat ${FILE} | grep ^facsimileTelephoneNumber: | perl -p -e 's/facsimileTelephoneNumber: //g')
 	do
-		echo -"TEL;TYPE=FAX;TYPE=WORK;ENCODING=8BIT;CHARSET=UTF-8:${facsimileTelephoneNumber}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+		echo "TEL;TYPE=FAX;TYPE=WORK;ENCODING=8BIT;CHARSET=UTF-8:${facsimileTelephoneNumber}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	done
 	for homePhone in $(cat ${FILE} | grep ^homePhone: | perl -p -e 's/homePhone: //g')
 	do
@@ -468,7 +468,5 @@ do
 done
 
 echo ""
-
-echo "****************************** ${SCRIPT_NAME} finished ******************************"
-
+echo "********************************* ${SCRIPT_NAME} finished *********************************"
 alldone 0

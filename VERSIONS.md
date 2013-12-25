@@ -10,6 +10,12 @@ Versions
 
 \! Known issue / missing feature
 
+#### α 0.2
+------------
+\+ Email report
+
+\+ Logging possibility
+
 
 #### α 0.1
 ------------
