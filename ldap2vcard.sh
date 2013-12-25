@@ -8,7 +8,7 @@
 #             Yvan Godard 
 #        godardyvan@gmail.com
 #
-#	Version α 0.1 -- decemeber, 24 2013
+#	Version α 0.3 -- decemeber, 24 2013
 #         Tool licenced under 
 #   Creative Commons 4.0 BY NC SA
 #
@@ -16,7 +16,7 @@
 #-----------------------------------------
 
 # Variables initialisation
-VERSION="LDAP2vCard α 0.1 -- 2013 -- http://goo.gl/i3gpVV"
+VERSION="LDAP2vCard α 0.3 -- 2013 -- http://goo.gl/i3gpVV"
 help="no"
 SCRIPT_DIR=$(dirname $0)
 SCRIPT_NAME=$(basename $0)
@@ -327,9 +327,15 @@ if [[ ${GROUP_LIMIT} != "0" ]]
 	if [ -f ${CONTENT_GROUP} ] && [[ ! -z $(cat ${CONTENT_GROUP}) ]]
 		then
 		cat ${CONTENT_GROUP} >> ${LIST_USERS}
+		GROUP_FULL_NAME=""
+		if [[ ${LDAP_GROUP_OBJECTCLASS} = "posixGroup" ]] && [[ ! -z $(${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} apple-group-realname | grep apple-group-realname: ) ]]
+			then
+			GROUP_FULL_NAME=$(${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} apple-group-realname | grep apple-group-realname: | awk 'sub( "^......................", "")')
+			echo "   ...Group full name: ${GROUP_FULL_NAME}"
+		fi
 		for CONTENT_GROUP_USER in $(cat ${CONTENT_GROUP})
 		do
-			echo "${CONTENT_GROUP_USER} ${GROUP}" >> ${LIST_GROUP_MEMBERS}
+			echo "${CONTENT_GROUP_USER} ${GROUP} $(echo ${GROUP_FULL_NAME} | perl -p -e 's/ /%%%/g')" >> ${LIST_GROUP_MEMBERS}
 		done
 	fi
 	rm ${CONTENT_GROUP}
@@ -362,10 +368,11 @@ done
 if [[ ${GROUP_LIMIT} != "0" ]]
 	then
 	cat ${LIST_GROUP_MEMBERS} | \
-	while read UID_USER GROUP_USER
+	while read UID_USER GROUP_USER GROUP_FN
 	do
 		[[ -z ${UID_USER} ]] && [[ -z ${GROUP_USER} ]] && continue
-		echo "memberOf: ${GROUP_USER}" >> ${DIR_TEMP_USERS}/${UID_USER}
+		[[ -z ${GROUP_FN} ]] && echo "memberOf: ${GROUP_USER}" >> ${DIR_TEMP_USERS}/${UID_USER}
+		[[ ! -z ${GROUP_FN} ]] && echo "memberOf: $(echo ${GROUP_FN} | perl -p -e 's/%%%/ /g')" >> ${DIR_TEMP_USERS}/${UID_USER}		
 	done < ${LIST_GROUP_MEMBERS}
 fi
 
@@ -386,7 +393,7 @@ do
 	IM_ICQ=$(cat ${FILE} | grep '^apple-imhandle: ICQ:' | perl -p -e 's/apple-imhandle: ICQ://g')
 	IM_JABBER=$(cat ${FILE} | grep '^apple-imhandle: Jabber:' | perl -p -e 's/apple-imhandle: Jabber://g')
 	IM_YAHOO=$(cat ${FILE} | grep '^apple-imhandle: Yahoo:' | perl -p -e 's/apple-imhandle: Yahoo://g')
-	CATEGORIES=$(cat ${FILE} | grep '^memberOf' | perl -p -e 's/memberOf: //g' | perl -p -e 's/\n/,/g' | awk 'sub( ".$", "" )')
+	
 	# Begining vCard
 	echo "BEGIN:VCARD" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	echo "VERSION:3.0" >> ${PATH_EXPORT_VCARD}/${DATANAME}
@@ -452,6 +459,9 @@ do
 	do
 		echo "TEL;TYPE=PAGER;TYPE=WORK;ENCODING=8BIT;CHARSET=UTF-8:${pager}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	done
+	# Processing categories
+	CATEGORIES=$(cat ${FILE} | grep '^memberOf' | perl -p -e 's/memberOf: //g' | perl -p -e 's/\n/,/g')
+	[[ ! -z ${CATEGORIES} ]] && echo "CATEGORIES;ENCODING=8BIT;CHARSET=UTF-8:$(echo ${CATEGORIES} | awk 'sub( ".$", "" )')" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	IFS=$OLDIFS
 	echo "X-AIM;ENCODING=8BIT;CHARSET=UTF-8:${IM_AIM}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	echo "X-ICQ;ENCODING=8BIT;CHARSET=UTF-8:${IM_ICQ}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
@@ -463,7 +473,6 @@ do
 	echo "KIND:organization" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	echo "NOTE;ENCODING=8BIT;CHARSET=UTF-8:Export made on ${HOSTNAME}\nwith ${VERSION}\n\n`date +"%Y-%m-%d-%H:%M:%S"`" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	echo "UID:${UID_VCARD}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "CATEGORIES:${CATEGORIES}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	echo "END:VCARD" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 done
 

@@ -10,6 +10,12 @@ Versions
 
 \! Known issue / missing feature
 
+
+#### α 0.3
+------------
+\* Support now attribute *apple-group-realname* for *posixGroup* (export fullname instead of uid in categories)
+
+
 #### α 0.2
 ------------
 \+ Email report
