@@ -4,7 +4,7 @@ LDAP2vCard
 Présentation
 ------------
 
-Cet outil est destiné à assurer un export au format vCard des informations/coordonnées d'utilisateurs enregistrés sur un serveur LDAP.
+Cet outil est destiné à assurer un export au format vCard des informations/coordonnées d'utilisateurs enreigstrés sur un serveur LDAP.
 Cet outil peut être utilisé en exportant la totalité des utilisateurs enregistrés dans le LDAP, ou en limitant l'export à certains groupes, qu'il s'agisse de groupes de type *groupOfNames* ou *posixGroup*.
 
 Les données disponibles pour vos utilisateurs dépendent des attributs disponibles dans le schema LDAP que vous utilisez. Ici le script exploite les attributs disponibles sur un OpenDirectory (Apple Mac OS X Server 10.6).
