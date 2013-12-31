@@ -9,7 +9,7 @@ Cet outil peut être utilisé en exportant la totalité des utilisateurs enregis
 
 Les données disponibles pour vos utilisateurs dépendent des attributs disponibles dans le schema LDAP que vous utilisez. Ici le script exploite les attributs disponibles sur un OpenDirectory (Apple Mac OS X Server 10.6).
 
-Pour une aide complète, installer le script et lancez le :
+Pour une aide complète, installez le script et lancez le :
 
     ./ldap2vcard.sh help
 
