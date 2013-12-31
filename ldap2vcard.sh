@@ -386,7 +386,7 @@ do
 	ORGANIZATION=$(cat ${FILE} | grep ^apple-company: | perl -p -e 's/apple-company: //g')
 	TITLE=$(cat ${FILE} | grep ^title: | perl -p -e 's/title: //g')
 	ADR="$(cat ${FILE} | grep ^street: | perl -p -e 's/street: //g');$(cat ${FILE} | grep ^l: | perl -p -e 's/l: //g');;$(cat ${FILE} | grep postalCode: | perl -p -e 's/postalCode: //g');$(cat ${FILE} | grep c: | perl -p -e 's/c: //g')"
-	UID_VCARD="$(cat ${FILE} | grep ^uid: | perl -p -e 's/uid: //g')-$(cat ${FILE} | grep uidNumber: | perl -p -e 's/uidNumber: //g')"
+	UID_VCARD="ldap2vcard-$(cat ${FILE} | grep ^uid: | perl -p -e 's/uid: //g')-$(cat ${FILE} | grep uidNumber: | perl -p -e 's/uidNumber: //g')"
 	ROLE=$(cat ${FILE} | grep ^apple-departmentNumber: | perl -p -e 's/departmentNumber: //g')
 	IM_AIM=$(cat ${FILE} | grep '^apple-imhandle: AIM:' | perl -p -e 's/apple-imhandle: AIM://g')
 	IM_MSN=$(cat ${FILE} | grep '^apple-imhandle: MSN:' | perl -p -e 's/apple-imhandle: MSN://g')
