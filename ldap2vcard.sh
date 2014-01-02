@@ -33,7 +33,6 @@ LIST_GROUP_MEMBERS=$(mktemp /tmp/LDAP2vCard_group_members.XXXXX)
 DIR_TEMP_USERS=/tmp/LDAP2vCardUsers
 LDAP_URL="ldap://127.0.0.1"
 LDAP_DN_USER_BRANCH="cn=users"
-URL_SNV_LDAPCSVEXPORT="https://svn.code.sf.net/p/ldap-csvexport/code/"
 PATH_EXPORT_VCARD=${SCRIPT_DIR}
 DATANAME="LDAP2vCard-$(date +%d.%m.%y-%Hh%M).vcf"
 
@@ -171,20 +170,8 @@ fi
 
 if [[ ${LDAP_ADMIN_PASS} = "" ]]
 	then
-	echo "Password for $LDAP_ADMIN_UID,$LDAP_DN_USER_BRANCH,$LDAP_DN_BASE?" 
+	echo "Password for uid=$LDAP_ADMIN_UID,$LDAP_DN_USER_BRANCH,$LDAP_DN_BASE?" 
 	read -s LDAP_ADMIN_PASS
-fi
-
-# Need '-t' and '-g' to be filled if '-G' is used
-[[ ${GROUP_LIMIT} != "0" ]] && [[ ${optsCount_limit_groups} != "2" ]] && error "Trying to use '-G' option but '-t <LDAP group objectClass>' and '-g <relative DN of LDAP group>' are not filled." 
-
-# Verification of LDAP_GROUP_OBJECTCLASS parameter
-[[ ${GROUP_LIMIT} != "0" ]] && [[ ${LDAP_GROUP_OBJECTCLASS} != "posixGroup" ]] && [[ ${LDAP_GROUP_OBJECTCLASS} != "groupOfNames" ]] && error "Parameter '-t ${LDAP_GROUP_OBJECTCLASS}' is not correct.\n-t must be 'posixGroup' or 'groupOfNames'"
-
-# Path to export needs to be a valid folder
-if [[ ${PATH_EXPORT_VCARD} != ${SCRIPT_DIR} ]]
-	then
-	[[ ! -d  ${PATH_EXPORT_VCARD} ]] && echo -e "This export path filled with '-P ${PATH_EXPORT_VCARD}' doesn't exist. Export will be done at ${SCRIPT_DIR}." && PATH_EXPORT_VCARD=${SCRIPT_DIR}
 fi
 
 # Redirect standard outpout to temp file
@@ -214,40 +201,52 @@ if [[ ${LOG_ACTIVE} != "0" ]]
 	echo -e "\t-j ${LOG} (log file)"
 fi
 
+# Need '-t' and '-g' to be filled if '-G' is used
+[[ ${GROUP_LIMIT} != "0" ]] && [[ ${optsCount_limit_groups} != "2" ]] && error "Trying to use '-G' option but '-t <LDAP group objectClass>' and '-g <relative DN of LDAP group>' are not filled." 
+
+# Verification of LDAP_GROUP_OBJECTCLASS parameter
+[[ ${GROUP_LIMIT} != "0" ]] && [[ ${LDAP_GROUP_OBJECTCLASS} != "posixGroup" ]] && [[ ${LDAP_GROUP_OBJECTCLASS} != "groupOfNames" ]] && error "Parameter '-t ${LDAP_GROUP_OBJECTCLASS}' is not correct.\n-t must be 'posixGroup' or 'groupOfNames'"
+
+# Path to export needs to be a valid folder
+if [[ ${PATH_EXPORT_VCARD} != ${SCRIPT_DIR} ]]
+	then
+	[[ ! -d  ${PATH_EXPORT_VCARD} ]] && echo -e "This export path filled with '-P ${PATH_EXPORT_VCARD}' doesn't exist. Export will be done at ${SCRIPT_DIR}." && PATH_EXPORT_VCARD=${SCRIPT_DIR}
+fi
+
 # Test of sending email parameter and check the consistency of the parameter email address
 if [[ ${EMAIL_REPORT} = "forcemail" ]]
 	then
 	EMAIL_LEVEL=2
-	if [[ -z $EMAIL_ADDRESS ]]
+	if [[ -z ${EMAIL_ADDRESS} ]]
 		then
-		echo -e "You use option '-e $EMAIL_REPORT' but you have not entered any email info.\n\t-> We continue the process without sending email."
+		echo -e "You use option '-e ${EMAIL_REPORT}' but you have not entered any email info.\n\t-> We continue the process without sending email."
 		EMAIL_LEVEL=0
 	else
 		echo "${EMAIL_ADDRESS}" | grep '^[a-zA-Z0-9._-]*@[a-zA-Z0-9._-]*\.[a-zA-Z0-9._-]*$' > /dev/null 2>&1
 		if [ $? -ne 0 ]
 			then
-    		echo -e "This address '$EMAIL_ADDRESS' does not seem valid.\n\t-> We continue the process without sending email."
+    		echo -e "This address '${EMAIL_REPORT}' does not seem valid.\n\t-> We continue the process without sending email."
     		EMAIL_LEVEL=0
     	fi
     fi
 elif [[ ${EMAIL_REPORT} = "onerror" ]]
 	then
 	EMAIL_LEVEL=1
-	if [[ -z $EMAIL_ADDRESS ]]
+	if [[ -z ${EMAIL_ADDRESS} ]]
 		then
-		echo -e "You use option '-e $EMAIL_REPORT' but you have not entered any email info.\n\t-> We continue the process without sending email."
+		echo -e "You use option '-e ${EMAIL_REPORT}' but you have not entered any email info.\n\t-> We continue the process without sending email."
 		EMAIL_LEVEL=0
 	else
 		echo "${EMAIL_ADDRESS}" | grep '^[a-zA-Z0-9._-]*@[a-zA-Z0-9._-]*\.[a-zA-Z0-9._-]*$' > /dev/null 2>&1
 		if [ $? -ne 0 ]
 			then	
-    		echo -e "This address '$EMAIL_ADDRESS' does not seem valid.\n\t-> We continue the process without sending email."
+    		echo -e "This address '${EMAIL_REPORT}' does not seem valid.\n\t-> We continue the process without sending email."
     		EMAIL_LEVEL=0
     	fi
     fi
 elif [[ ${EMAIL_REPORT} != "nomail" ]]
 	then
-	echo -e "\nOption '-e $EMAIL_REPORT' is not valid (must be: 'onerror', 'forcemail' or 'nomail').\n\t-> We continue the process without sending email."
+	echo -e "\nOption '-e ${EMAIL_REPORT}' is not valid (must be: 'onerror', 'forcemail' or 'nomail').\n\t-> We continue the process without sending email."
 	EMAIL_LEVEL=0
 elif [[ ${EMAIL_REPORT} = "nomail" ]]
 	then
@@ -297,7 +296,7 @@ fi
 if [[ ${GROUP_LIMIT} != "0" ]]
 	then
 	echo -e "\nExporting users in groups below, objectClass ${LDAP_GROUP_OBJECTCLASS}:"
-	echo -e "$(cat $LIST_GROUPS | perl -p -e 's/\n/ - /g' | awk 'sub( "...$", "" )')\n"
+	echo -e "$(cat ${LIST_GROUPS} | perl -p -e 's/\n/ - /g' | awk 'sub( "...$", "" )')\n"
 	for GROUP in $(cat ${LIST_GROUPS})
 	do
 	CONTENT_GROUP=$(mktemp /tmp/LDAP2vCard_group_content.XXXXX)
