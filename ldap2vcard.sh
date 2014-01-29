@@ -1,22 +1,25 @@
 #! /bin/bash
-#-----------------------------------------
-#          	   LDAP2vCard
-#
-#      Exporte contact informations 
-#     from LDAP branch to vCard file
-#
-#             Yvan Godard 
-#        godardyvan@gmail.com
-#
-#	Version α 0.3 -- decemeber, 24 2013
-#         Tool licenced under 
-#   Creative Commons 4.0 BY NC SA
-#
-#         http://goo.gl/i3gpVV
-#-----------------------------------------
+
+#-------------------------------------#
+#            LDAP2vCard               #
+#-------------------------------------#
+#                                     #
+#    Export contact informations      #
+#   from LDAP branch to vCard file    #
+#                                     #
+#             Yvan Godard             #
+#        godardyvan@gmail.com         #
+#                                     #
+# Version α 0.4 -- decemeber, 24 2013 #
+#         Tool licenced under         #
+#   Creative Commons 4.0 BY NC SA     #
+#                                     #
+#         http://goo.gl/i3gpVV        #
+#                                     #
+#-------------------------------------#
 
 # Variables initialisation
-VERSION="LDAP2vCard α 0.3 -- 2013 -- http://goo.gl/i3gpVV"
+VERSION="LDAP2vCard α 0.4 -- 2013 -- http://goo.gl/i3gpVV"
 help="no"
 SCRIPT_DIR=$(dirname $0)
 SCRIPT_NAME=$(basename $0)
@@ -34,7 +37,7 @@ DIR_TEMP_USERS=/tmp/LDAP2vCardUsers
 LDAP_URL="ldap://127.0.0.1"
 LDAP_DN_USER_BRANCH="cn=users"
 PATH_EXPORT_VCARD=${SCRIPT_DIR}
-DATANAME="LDAP2vCard-$(date +%d.%m.%y-%Hh%M).vcf"
+DATAFILENAME="LDAP2vCard-$(date +%d.%m.%y-%Hh%M)"
 
 help () {
 	echo -e "$VERSION\n"
@@ -46,7 +49,7 @@ help () {
 	echo -e "\nSynopsis:"
 	echo -e "./${SCRIPT_NAME} [-h] | -d <base namespace> -a <LDAP admin UID> -p <LDAP admin password>"
 	echo -e "                [-s <LDAP server>] [-u <relative DN of user banch>]"
-	echo -e "                [-D <main damain for emails>] [-P <Path folder to export>]"
+	echo -e "                [-D <main domain for emails>] [-P <Path folder to export>] [-N <Name of export file>]"
 	echo -e "                [-G <groups to export> -t <LDAP group objectClass> -g <relative DN of LDAP group base>]"
 	echo -e "                [-e <email report option>] [-E <email address>] [-j <log file>]"
 	echo -e "\n\t-h:                               prints this help then exit"
@@ -63,6 +66,7 @@ help () {
 	echo -e "\t-t <LDAP group objectClass>:      the type of groups you want to export, must be 'posixGroup' or 'groupOfNames', must be filled if '-G' is used"	
 	echo -e "\t-g <relative DN of LDAP group>:   the relative DN of the LDAP branch that contains groups (i.e.: 'cn=groups' or 'ou=groups'...) - must be filled if '-G' is used"
 	echo -e "\t-P <Path folder to export>:       the folder where your want to export your vCard (i.e.: '~/Desktop/' or '/var/vcard/'...), by default ${PATH_EXPORT_VCARD}"
+	echo -e "\t-N <Name of export file>:         the name of exported file, without spaces and extension (i.e.: 'myExportvCard'), by default ${DATAFILENAME}"
 	echo -e "\t-e <email report option>:         settings for sending a report by email, must be 'onerror', 'forcemail' or 'nomail' (default: '$EMAIL_REPORT')"
 	echo -e "\t-E <email address>:               email address to send the report, must be filled if '-e forcemail' or '-e onerror' options is used"
 	echo -e "\t-j <log file>:                    enables logging instead of standard output. Specify an argument for the full path to the log file"
@@ -110,7 +114,7 @@ mkdir -p ${DIR_TEMP_USERS}
 optsCount=0
 optsCount_limit_groups=0
 
-while getopts "hd:a:p:t:g:s:u:D:G:P:e:E:j:" OPTION
+while getopts "hd:a:p:t:g:s:u:D:G:P:e:E:j:N:" OPTION
 do
 	case "$OPTION" in
 		h)	help="yes"
@@ -147,6 +151,8 @@ do
                         ;;
         P)	PATH_EXPORT_VCARD=${OPTARG}
                         ;;
+        N)	DATAFILENAME=${OPTARG}
+                        ;;
         e)	EMAIL_REPORT=${OPTARG}
                         ;;                             
         E)	EMAIL_ADDRESS=${OPTARG}
@@ -174,6 +180,14 @@ if [[ ${LDAP_ADMIN_PASS} = "" ]]
 	read -s LDAP_ADMIN_PASS
 fi
 
+# Verification of DATANAME
+if [[ ${DATAFILENAME} = "" ]]
+	then
+	DATANAME="LDAP2vCard-$(date +%d.%m.%y-%Hh%M).vcf"
+	else
+	DATANAME=${DATAFILENAME}.vcf
+fi
+
 # Redirect standard outpout to temp file
 exec 6>&1
 exec >> $LOG_TEMP
@@ -185,6 +199,7 @@ echo -e "\t-d ${LDAP_DN_BASE} (base namespace)"
 echo -e "\t-a ${LDAP_ADMIN_UID} (LDAP admin UID)"
 echo -e "\t-s ${LDAP_URL} (LDAP server)"
 echo -e "\t-u ${LDAP_DN_USER_BRANCH} (relative DN of user banch)"
+[[ ${MAIN_DOMAIN} != "" ]] && echo -e "\t-D ${MAIN_DOMAIN} (main domain for emails)"
 if [[ ${GROUP_LIMIT} != "0" ]]
 	then
 	echo -e "\t-G ${LDAP_GROUPS} (limit export to these groups)"
@@ -200,6 +215,7 @@ if [[ ${LOG_ACTIVE} != "0" ]]
 	then
 	echo -e "\t-j ${LOG} (log file)"
 fi
+echo -e "Export to ${PATH_EXPORT_VCARD}/${DATANAME}"
 
 # Need '-t' and '-g' to be filled if '-G' is used
 [[ ${GROUP_LIMIT} != "0" ]] && [[ ${optsCount_limit_groups} != "2" ]] && error "Trying to use '-G' option but '-t <LDAP group objectClass>' and '-g <relative DN of LDAP group>' are not filled." 
@@ -462,15 +478,23 @@ do
 	CATEGORIES=$(cat ${FILE} | grep '^memberOf' | perl -p -e 's/memberOf: //g' | perl -p -e 's/\n/,/g')
 	[[ ! -z ${CATEGORIES} ]] && echo "CATEGORIES;ENCODING=8BIT;CHARSET=UTF-8:$(echo ${CATEGORIES} | awk 'sub( ".$", "" )')" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	IFS=$OLDIFS
-	echo "X-AIM;ENCODING=8BIT;CHARSET=UTF-8:${IM_AIM}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "X-ICQ;ENCODING=8BIT;CHARSET=UTF-8:${IM_ICQ}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "X-JABBER;ENCODING=8BIT;CHARSET=UTF-8:${IM_JABBER}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "X-MSN;ENCODING=8BIT;CHARSET=UTF-8:${IM_MSN}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "X-YAHOO;ENCODING=8BIT;CHARSET=UTF-8:${IM_YAHOO}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=aim:aim;CHARSET=UTF-8:${IM_AIM}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=icq:icq;CHARSET=UTF-8:${IM_ICQ}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=jabber:xmpp;CHARSET=UTF-8:${IM_JABBER}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=msn:msn;CHARSET=UTF-8:${IM_MSN}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=yahoo:ymsgr;CHARSET=UTF-8:${IM_YAHOO}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=sip:sip;CHARSET=UTF-8:" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=twitter:twitter;CHARSET=UTF-8:" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=googletalk:xmpp;CHARSET=UTF-8:" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=xmpp:xmpp;CHARSET=UTF-8:" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=facebook:xmpp;CHARSET=UTF-8:" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=skype:skype;CHARSET=UTF-8:" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=qq:x-apple;CHARSET=UTF-8:" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=gadugadu:x-apple;CHARSET=UTF-8:" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	echo "REV:$(date +"%Y%m%dT%H%M%SZ")" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	echo "X-ABUID:ABPerson" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	echo "KIND:organization" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "NOTE;ENCODING=8BIT;CHARSET=UTF-8:Export made on ${HOSTNAME}\nwith ${VERSION}\n\n`date +"%Y-%m-%d-%H:%M:%S"`" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	# echo "NOTE;ENCODING=8BIT;CHARSET=UTF-8:Export made on ${HOSTNAME}\nwith ${VERSION}\n\n`date +"%Y-%m-%d-%H:%M:%S"`" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	echo "UID:${UID_VCARD}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	echo "END:VCARD" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 done

@@ -11,6 +11,11 @@ Versions
 \! Known issue / missing feature
 
 
+#### α 0.4
+------------
+\+ New parameter -N to choose the filename of export
+
+
 #### α 0.3
 ------------
 \* Support now attribute *apple-group-realname* for *posixGroup* (export fullname instead of uid in categories)
