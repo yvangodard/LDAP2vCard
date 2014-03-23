@@ -10,7 +10,7 @@
 #             Yvan Godard             #
 #        godardyvan@gmail.com         #
 #                                     #
-# Version α 0.4 -- decemeber, 24 2013 #
+# Version α 0.5 -- decemeber, 24 2013 #
 #         Tool licenced under         #
 #   Creative Commons 4.0 BY NC SA     #
 #                                     #
@@ -19,7 +19,7 @@
 #-------------------------------------#
 
 # Variables initialisation
-VERSION="LDAP2vCard α 0.4 -- 2013 -- http://goo.gl/i3gpVV"
+VERSION="LDAP2vCard α 0.5 -- 2013 -- http://goo.gl/i3gpVV"
 help="no"
 SCRIPT_DIR=$(dirname $0)
 SCRIPT_NAME=$(basename $0)
@@ -38,6 +38,7 @@ LDAP_URL="ldap://127.0.0.1"
 LDAP_DN_USER_BRANCH="cn=users"
 PATH_EXPORT_VCARD=${SCRIPT_DIR}
 DATAFILENAME="LDAP2vCard-$(date +%d.%m.%y-%Hh%M)"
+WITH_LDAP_BIND="no"
 
 help () {
 	echo -e "$VERSION\n"
@@ -47,17 +48,18 @@ help () {
 	echo -e "\nDisclamer:"
 	echo -e "This tool is provide without any support and guarantee."
 	echo -e "\nSynopsis:"
-	echo -e "./${SCRIPT_NAME} [-h] | -d <base namespace> -a <LDAP admin UID> -p <LDAP admin password>"
+	echo -e "./${SCRIPT_NAME} [-h] | -d <base namespace>"
+	echo -e "                [-a <LDAP admin UID>] [-p <LDAP admin password>]"
 	echo -e "                [-s <LDAP server>] [-u <relative DN of user banch>]"
 	echo -e "                [-D <main domain for emails>] [-P <Path folder to export>] [-N <Name of export file>]"
 	echo -e "                [-G <groups to export> -t <LDAP group objectClass> -g <relative DN of LDAP group base>]"
 	echo -e "                [-e <email report option>] [-E <email address>] [-j <log file>]"
 	echo -e "\n\t-h:                               prints this help then exit"
-	echo -e "\nMandatory options:"
+	echo -e "\nMandatory option:"
 	echo -e "\t-d <base namespace>:              the base DN for each LDAP entry (i.e.: 'dc=server,dc=office,dc=com')"
-	echo -e "\t-a <LDAP admin UID>:              UID of the LDAP administrator (i.e.: 'diradmin')"
-	echo -e "\t-p <LDAP admin password>:         the password of the LDAP administrator (asked if missing)"
 	echo -e "\nOptional options:"
+	echo -e "\t-a <LDAP admin UID>:              the LDAP administrator UID, if bind is needed to access LDAP (i.e.: 'diradmin')"
+	echo -e "\t-p <LDAP admin password>:         the password of the LDAP administrator (asked if missing and if )"
 	echo -e "\t-s <LDAP server>:                 the LDAP server URL (default: '$LDAP_URL')"
 	echo -e "\t-u <relative DN of user banch>:   the relative DN of the LDAP branch that contains the users (i.e.: 'cn=allusers', default: '$LDAP_DN_USER_BRANCH')"
 	echo -e "\t-D <main domain for emails>:      will mark addresses containing this domain as 'TYPE=PREF' in vCard (i.e.: 'mydomain.fr')"
@@ -123,7 +125,7 @@ do
 			let optsCount=$optsCount+1
 						;;
 		a)	LDAP_ADMIN_UID=${OPTARG}
-			let optsCount=$optsCount+1
+			[[ ${LDAP_ADMIN_UID} != "" ]] && WITH_LDAP_BIND="yes"
 						;;
 		p)	LDAP_ADMIN_PASS=${OPTARG}
                         ;;
@@ -163,7 +165,7 @@ do
 	esac
 done
 
-if [[ ${optsCount} != "2" ]]
+if [[ ${optsCount} != "1" ]]
 	then
         help
         alldone 1
@@ -174,7 +176,7 @@ if [[ ${help} = "yes" ]]
 	help
 fi
 
-if [[ ${LDAP_ADMIN_PASS} = "" ]]
+if [[ ${WITH_LDAP_BIND} = "yes" ]] && [[ ${LDAP_ADMIN_PASS} = "" ]]
 	then
 	echo "Password for uid=$LDAP_ADMIN_UID,$LDAP_DN_USER_BRANCH,$LDAP_DN_BASE?" 
 	read -s LDAP_ADMIN_PASS
@@ -229,6 +231,9 @@ if [[ ${PATH_EXPORT_VCARD} != ${SCRIPT_DIR} ]]
 	[[ ! -d  ${PATH_EXPORT_VCARD} ]] && echo -e "This export path filled with '-P ${PATH_EXPORT_VCARD}' doesn't exist. Export will be done at ${SCRIPT_DIR}." && PATH_EXPORT_VCARD=${SCRIPT_DIR}
 fi
 
+# Verification of LDAP_URL parameter
+[[ ${LDAP_URL} = "" ]] && echo -e "You used option '-s' but you have not entered any LDAP url. Wi'll try to continue with url 'ldap://127.0.0.1'" && LDAP_URL="ldap://127.0.0.1"
+
 # Test of sending email parameter and check the consistency of the parameter email address
 if [[ ${EMAIL_REPORT} = "forcemail" ]]
 	then
@@ -272,11 +277,15 @@ fi
 # LDAP connection test
 echo -e "\nConnecting LDAP at $LDAP_URL ..."
 
-LDAP_COMMAND_BEGIN="ldapsearch -LLL -H ${LDAP_URL} -D uid=${LDAP_ADMIN_UID},${LDAP_DN_USER_BRANCH},${LDAP_DN_BASE} -w ${LDAP_ADMIN_PASS}"
+[[ ${WITH_LDAP_BIND} = "yes" ]] && LDAP_COMMAND_BEGIN="ldapsearch -LLL -H ${LDAP_URL} -D uid=${LDAP_ADMIN_UID},${LDAP_DN_USER_BRANCH},${LDAP_DN_BASE} -w ${LDAP_ADMIN_PASS}"
+[[ ${WITH_LDAP_BIND} = "no" ]] && LDAP_COMMAND_BEGIN="ldapsearch -LLL -H ${LDAP_URL} -x"
+
 ${LDAP_COMMAND_BEGIN} -b ${LDAP_DN_USER_BRANCH},${LDAP_DN_BASE} > /dev/null 2>&1
 if [ $? -ne 0 ]
 	then 
-	error "Error connecting to LDAP server.\nPlease verify your URL and user/pass."
+	error "Error connecting to LDAP server.\nPlease verify your LDAP_URL and, if needed to bind LDAP, user and pass."
+else
+	echo "OK!"
 fi
 
 # Export user list : all users registered in LDAP
@@ -403,21 +412,16 @@ do
 	ADR="$(cat ${FILE} | grep ^street: | perl -p -e 's/street: //g');$(cat ${FILE} | grep ^l: | perl -p -e 's/l: //g');;$(cat ${FILE} | grep postalCode: | perl -p -e 's/postalCode: //g');$(cat ${FILE} | grep c: | perl -p -e 's/c: //g')"
 	UID_VCARD="ldap2vcard-$(cat ${FILE} | grep ^uid: | perl -p -e 's/uid: //g')-$(cat ${FILE} | grep uidNumber: | perl -p -e 's/uidNumber: //g')"
 	ROLE=$(cat ${FILE} | grep ^apple-departmentNumber: | perl -p -e 's/departmentNumber: //g')
-	IM_AIM=$(cat ${FILE} | grep '^apple-imhandle: AIM:' | perl -p -e 's/apple-imhandle: AIM://g')
-	IM_MSN=$(cat ${FILE} | grep '^apple-imhandle: MSN:' | perl -p -e 's/apple-imhandle: MSN://g')
-	IM_ICQ=$(cat ${FILE} | grep '^apple-imhandle: ICQ:' | perl -p -e 's/apple-imhandle: ICQ://g')
-	IM_JABBER=$(cat ${FILE} | grep '^apple-imhandle: Jabber:' | perl -p -e 's/apple-imhandle: Jabber://g')
-	IM_YAHOO=$(cat ${FILE} | grep '^apple-imhandle: Yahoo:' | perl -p -e 's/apple-imhandle: Yahoo://g')
-	
+
 	# Begining vCard
 	echo "BEGIN:VCARD" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	echo "VERSION:3.0" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	echo "N;ENCODING=8BIT;CHARSET=UTF-8:${NAME};${FIRST_NAME}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "FN;ENCODING=8BIT;CHARSET=UTF-8:${FULL_NAME}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "ORG;ENCODING=8BIT;CHARSET=UTF-8:${ORGANIZATION}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "TITLE;ENCODING=8BIT;CHARSET=UTF-8:${TITLE}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "ADR;TYPE=WORK;ENCODING=8BIT;CHARSET=UTF-8:;;${ADR}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "ROLE;ENCODING=8BIT;CHARSET=UTF-8:${ROLE}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	[[ ! -z ${FULL_NAME} ]] && echo "FN;ENCODING=8BIT;CHARSET=UTF-8:${FULL_NAME}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	[[ ! -z ${ORGANIZATION} ]] && echo "ORG;ENCODING=8BIT;CHARSET=UTF-8:${ORGANIZATION}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	[[ ! -z ${TITLE} ]] && echo "TITLE;ENCODING=8BIT;CHARSET=UTF-8:${TITLE}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	[[ ! -z ${ADR} ]] && echo "ADR;TYPE=WORK;ENCODING=8BIT;CHARSET=UTF-8:;;${ADR}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	[[ ! -z ${ROLE} ]] && echo "ROLE;ENCODING=8BIT;CHARSET=UTF-8:${ROLE}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	# Processing emails
 	LIST_EMAILS_ADDRESS=$(mktemp /tmp/LDAP2vCard_list_emails_addresses.XXXXX)
 	SECONDARY_EMAILS=$(mktemp /tmp/LDAP2vCard_list_sec_emails_addresses.XXXXX)
@@ -452,7 +456,7 @@ do
     fi
     rm ${LIST_EMAILS_ADDRESS}
     rm ${SECONDARY_EMAILS}
-    # Processing phone numbers
+    # Processing phone numbers & IM
 	OLDIFS=$IFS; IFS=$'\n'
 	for telephoneNumber in $(cat ${FILE} | grep ^telephoneNumber: | perl -p -e 's/telephoneNumber: //g')
 	do
@@ -474,28 +478,67 @@ do
 	do
 		echo "TEL;TYPE=PAGER;TYPE=WORK;ENCODING=8BIT;CHARSET=UTF-8:${pager}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	done
+	for aim in $(cat ${FILE} | grep '^apple-imhandle: AIM:' | perl -p -e 's/apple-imhandle: AIM://g')
+	do
+		echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=aim:aim;CHARSET=UTF-8:${aim}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	done
+	for icq in $(cat ${FILE} | grep '^apple-imhandle: ICQ:' | perl -p -e 's/apple-imhandle: ICQ://g')
+	do
+		echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=icq:icq;CHARSET=UTF-8:${icq}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	done
+	for jabber in $(cat ${FILE} | grep '^apple-imhandle: Jabber:' | perl -p -e 's/apple-imhandle: Jabber://g')
+	do
+		echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=jabber:xmpp;CHARSET=UTF-8:${jabber}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	done
+	for msn in $(cat ${FILE} | grep '^apple-imhandle: MSN:' | perl -p -e 's/apple-imhandle: MSN://g')
+	do
+		echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=msn:msn;CHARSET=UTF-8:${msn}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	done
+	for yahoo in $(cat ${FILE} | grep '^apple-imhandle: Yahoo:' | perl -p -e 's/apple-imhandle: Yahoo://g')
+	do
+		echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=yahoo:ymsgr;CHARSET=UTF-8:${yahoo}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	done
+	for sip in $(cat ${FILE} | grep '^apple-imhandle: SIP:' | perl -p -e 's/apple-imhandle: SIP://g')
+	do
+		echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=sip:sip;CHARSET=UTF-8:${sip}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	done
+	for twitter in $(cat ${FILE} | grep '^apple-imhandle: Twitter:' | perl -p -e 's/apple-imhandle: Twitter://g')
+	do
+		echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=twitter:twitter;CHARSET=UTF-8:${twitter}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	done
+	for googletalk in $(cat ${FILE} | grep '^apple-imhandle: GTalk:' | perl -p -e 's/apple-imhandle: Gtalk://g')
+	do
+		echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=googletalk:xmpp;CHARSET=UTF-8:${googletalk}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	done
+	for xmpp in $(cat ${FILE} | grep '^apple-imhandle: XMPP:' | perl -p -e 's/apple-imhandle: XMPP://g')
+	do
+		echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=xmpp:xmpp;CHARSET=UTF-8:${xmpp}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	done
+	for facebook in $(cat ${FILE} | grep '^apple-imhandle: Facebook:' | perl -p -e 's/apple-imhandle: Facebook://g')
+	do
+		echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=facebook:xmpp;CHARSET=UTF-8:${facebook}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	done
+	for skype in $(cat ${FILE} | grep '^apple-imhandle: Skype:' | perl -p -e 's/apple-imhandle: Skype://g')
+	do
+		echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=skype:skype;CHARSET=UTF-8:${skype}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	done
+	for qq in $(cat ${FILE} | grep '^apple-imhandle: QQ:' | perl -p -e 's/apple-imhandle: QQ://g')
+	do
+		echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=qq:x-apple;CHARSET=UTF-8:${qq}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	done
+	for gadugadu in $(cat ${FILE} | grep '^apple-imhandle: Gadugadu:' | perl -p -e 's/apple-imhandle: Gadugadu://g')
+	do
+		echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=gadugadu:x-apple;CHARSET=UTF-8:${gadugadu}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	done
 	# Processing categories
 	CATEGORIES=$(cat ${FILE} | grep '^memberOf' | perl -p -e 's/memberOf: //g' | perl -p -e 's/\n/,/g')
 	[[ ! -z ${CATEGORIES} ]] && echo "CATEGORIES;ENCODING=8BIT;CHARSET=UTF-8:$(echo ${CATEGORIES} | awk 'sub( ".$", "" )')" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	IFS=$OLDIFS
-	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=aim:aim;CHARSET=UTF-8:${IM_AIM}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=icq:icq;CHARSET=UTF-8:${IM_ICQ}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=jabber:xmpp;CHARSET=UTF-8:${IM_JABBER}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=msn:msn;CHARSET=UTF-8:${IM_MSN}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=yahoo:ymsgr;CHARSET=UTF-8:${IM_YAHOO}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=sip:sip;CHARSET=UTF-8:" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=twitter:twitter;CHARSET=UTF-8:" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=googletalk:xmpp;CHARSET=UTF-8:" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=xmpp:xmpp;CHARSET=UTF-8:" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=facebook:xmpp;CHARSET=UTF-8:" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=skype:skype;CHARSET=UTF-8:" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=qq:x-apple;CHARSET=UTF-8:" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=gadugadu:x-apple;CHARSET=UTF-8:" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	echo "REV:$(date +"%Y%m%dT%H%M%SZ")" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	echo "X-ABUID:ABPerson" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	echo "KIND:organization" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	# echo "NOTE;ENCODING=8BIT;CHARSET=UTF-8:Export made on ${HOSTNAME}\nwith ${VERSION}\n\n`date +"%Y-%m-%d-%H:%M:%S"`" >> ${PATH_EXPORT_VCARD}/${DATANAME}
-	echo "UID:${UID_VCARD}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	echo "NOTE;ENCODING=8BIT;CHARSET=UTF-8:Export made on ${HOSTNAME}\nwith ${VERSION}\n\n`date +"%Y-%m-%d-%H:%M:%S"`" >> ${PATH_EXPORT_VCARD}/${DATANAME}
+	[[ ! -z ${UID_VCARD} ]] && echo "UID:${UID_VCARD}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	echo "END:VCARD" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 done
 
