@@ -505,7 +505,7 @@ do
 	do
 		echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=twitter:twitter;CHARSET=UTF-8:${twitter}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	done
-	for googletalk in $(cat ${FILE} | grep '^apple-imhandle: GTalk:' | perl -p -e 's/apple-imhandle: Gtalk://g')
+	for googletalk in $(cat ${FILE} | grep '^apple-imhandle: GTalk:' | perl -p -e 's/apple-imhandle: GTalk://g')
 	do
 		echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=googletalk:xmpp;CHARSET=UTF-8:${googletalk}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	done
