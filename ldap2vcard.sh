@@ -198,7 +198,6 @@ exec >> $LOG_TEMP
 echo -e "\n****************************** `date` ******************************\n"
 echo -e "$0 started with options:"
 echo -e "\t-d ${LDAP_DN_BASE} (base namespace)"
-echo -e "\t-a ${LDAP_ADMIN_UID} (LDAP admin UID)"
 echo -e "\t-s ${LDAP_URL} (LDAP server)"
 echo -e "\t-u ${LDAP_DN_USER_BRANCH} (relative DN of user banch)"
 [[ ${MAIN_DOMAIN} != "" ]] && echo -e "\t-D ${MAIN_DOMAIN} (main domain for emails)"
