@@ -409,7 +409,7 @@ do
 	ORGANIZATION=$(cat ${FILE} | grep ^apple-company: | perl -p -e 's/apple-company: //g')
 	TITLE=$(cat ${FILE} | grep ^title: | perl -p -e 's/title: //g')
 	ADR="$(cat ${FILE} | grep ^street: | perl -p -e 's/street: //g');$(cat ${FILE} | grep ^l: | perl -p -e 's/l: //g');;$(cat ${FILE} | grep postalCode: | perl -p -e 's/postalCode: //g');$(cat ${FILE} | grep c: | perl -p -e 's/c: //g')"
-	UID_VCARD="ldap2vcard-${USER}-$(cat ${FILE} | grep uidNumber: | perl -p -e 's/uidNumber: //g')"
+	UID_VCARD="ldap2vcard-$(cat ${FILE} | grep ^uid: | head -1 | perl -p -e 's/uid: //g')-$(cat ${FILE} | grep uidNumber: | perl -p -e 's/uidNumber: //g')"
 	ROLE=$(cat ${FILE} | grep ^apple-departmentNumber: | perl -p -e 's/departmentNumber: //g')
 
 	# Begining vCard
