@@ -10,7 +10,7 @@
 #             Yvan Godard             #
 #        godardyvan@gmail.com         #
 #                                     #
-#    Version α 0.6 -- may, 15 2014    #
+#   Version α 0.7 -- april, 22 2015   #
 #         Tool licenced under         #
 #   Creative Commons 4.0 BY NC SA     #
 #                                     #
@@ -19,7 +19,7 @@
 #-------------------------------------#
 
 # Variables initialisation
-VERSION="LDAP2vCard α 0.6 -- 2013 -- http://goo.gl/i3gpVV"
+VERSION="LDAP2vCard α 0.7 -- 2015 -- http://goo.gl/i3gpVV"
 help="no"
 SCRIPT_DIR=$(dirname $0)
 SCRIPT_NAME=$(basename $0)
@@ -378,6 +378,8 @@ do
 	CONTENT_USER=$(mktemp /tmp/LDAP2vCard_user_content.XXXXX)
 	${LDAP_COMMAND_BEGIN} -b ${LDAP_DN_USER_BRANCH},${LDAP_DN_BASE} -x uid=${USER} uid uidNumber givenName sn cn apple-company departmentNumber title street postalCode l c telephoneNumber facsimileTelephoneNumber homePhone mobile pager apple-imhandle mail > ${CONTENT_USER}
 	[ $? -ne 0 ] && echo -e "Error while exporting user ${USER}. Please verify vCard result."
+	# Correction to support LDIF splitted lines, thanks to Guillaume Bougard (gbougard@pkg.fr)
+	perl -n -e 'chomp ; print "\n" unless (substr($_,0,1) eq " " || !defined($lines)); $_ =~ s/^\s+// ; print $_ ; $lines++;' -i "${CONTENT_USER}"
 	OLDIFS=$IFS; IFS=$'\n'
 	for LINE in $(cat ${CONTENT_USER})
 	do

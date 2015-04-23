@@ -10,6 +10,11 @@ Versions
 
 \! Known issue / missing feature
 
+#### α 0.7
+------------
+\* Correction to support LDIF splitted lines, thanks to Guillaume Bougard (gbougard@pkg.fr)
+
+
 #### α 0.6
 ------------
 \- Correction if an entry has many UID 
