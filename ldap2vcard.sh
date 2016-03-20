@@ -10,7 +10,7 @@
 #             Yvan Godard             #
 #        godardyvan@gmail.com         #
 #                                     #
-#   Version α 0.7 -- april, 22 2015   #
+#    Version 1.0 -- march, 18 2016    #
 #         Tool licenced under         #
 #   Creative Commons 4.0 BY NC SA     #
 #                                     #
@@ -19,7 +19,7 @@
 #-------------------------------------#
 
 # Variables initialisation
-VERSION="LDAP2vCard α 0.7 -- 2015 -- http://goo.gl/i3gpVV"
+VERSION="LDAP2vCard 1.0 -- 2016 -- http://goo.gl/i3gpVV"
 help="no"
 SCRIPT_DIR=$(dirname $0)
 SCRIPT_NAME=$(basename $0)
@@ -40,7 +40,7 @@ PATH_EXPORT_VCARD=${SCRIPT_DIR}
 DATAFILENAME="LDAP2vCard-$(date +%d.%m.%y-%Hh%M)"
 WITH_LDAP_BIND="no"
 
-help () {
+function help () {
 	echo -e "$VERSION\n"
 	echo -e "This tool is designed to export to vCard file informations related to users registered in a (or some) LDAP group."
 	echo -e "It works both with LDAP groups defined by objectClass posixGroup or groupOfNames."
@@ -76,14 +76,14 @@ help () {
 	exit 0
 }
 
-error () {
+function error () {
 	echo -e "\n*** Error ***"
 	echo -e ${1}
 	echo -e "\n"${VERSION}
 	alldone 1
 }
 
-alldone () {
+function alldone () {
 	# Redirect standard outpout
 	exec 1>&6 6>&-
 	# Logging if needed 
@@ -97,7 +97,7 @@ alldone () {
 	exit ${1}
 }
 
-base64decode () {
+function base64decode () {
 	echo ${1} | grep :: > /dev/null 2>&1
 	if [ $? -eq 0 ] 
 		then
@@ -107,6 +107,11 @@ base64decode () {
 	else
 		echo ${1}
 	fi
+}
+
+# Correction to support LDIF splitted lines, thanks to Guillaume Bougard (gbougard@pkg.fr)
+function deleteLineBreaks () {
+	perl -n -e 'chomp ; print "\n" unless (substr($_,0,1) eq " " || !defined($lines)); $_ =~ s/^\s+// ; print $_ ; $lines++;' -i ${1}
 }
 
 # Remove old temp and create new temp dir
@@ -376,15 +381,18 @@ cat ${LIST_USERS_CLEAN} | perl -p -e 's/\n/ - /g' | awk 'sub( "...$", "" )'
 for USER in $(cat ${LIST_USERS_CLEAN})
 do
 	CONTENT_USER=$(mktemp /tmp/LDAP2vCard_user_content.XXXXX)
-	${LDAP_COMMAND_BEGIN} -b ${LDAP_DN_USER_BRANCH},${LDAP_DN_BASE} -x uid=${USER} uid uidNumber givenName sn cn apple-company departmentNumber title street postalCode l c telephoneNumber facsimileTelephoneNumber homePhone mobile pager apple-imhandle mail > ${CONTENT_USER}
+	${LDAP_COMMAND_BEGIN} -b ${LDAP_DN_USER_BRANCH},${LDAP_DN_BASE} -x uid=${USER} uid uidNumber givenName sn cn apple-company departmentNumber title street postalCode l c telephoneNumber facsimileTelephoneNumber homePhone mobile pager apple-imhandle mail jpegPhoto > ${CONTENT_USER}
 	[ $? -ne 0 ] && echo -e "Error while exporting user ${USER}. Please verify vCard result."
-	# Correction to support LDIF splitted lines, thanks to Guillaume Bougard (gbougard@pkg.fr)
-	perl -n -e 'chomp ; print "\n" unless (substr($_,0,1) eq " " || !defined($lines)); $_ =~ s/^\s+// ; print $_ ; $lines++;' -i "${CONTENT_USER}"
+	deleteLineBreaks ${CONTENT_USER}
 	OLDIFS=$IFS; IFS=$'\n'
 	for LINE in $(cat ${CONTENT_USER})
 	do
-		base64decode $LINE >> ${DIR_TEMP_USERS}/${USER}
-	done
+		echo ${LINE} | grep ^jpegPhoto:: > /dev/null 2>&1
+		if [[ $? -eq 0 ]]; then
+			echo ${LINE} >> ${DIR_TEMP_USERS}/${USER}
+		else
+			base64decode ${LINE} >> ${DIR_TEMP_USERS}/${USER}
+		fi
 	IFS=$OLDIFS
 	rm ${CONTENT_USER}
 done
@@ -413,6 +421,7 @@ do
 	ADR="$(cat ${FILE} | grep ^street: | perl -p -e 's/street: //g');$(cat ${FILE} | grep ^l: | perl -p -e 's/l: //g');;$(cat ${FILE} | grep postalCode: | perl -p -e 's/postalCode: //g');$(cat ${FILE} | grep c: | perl -p -e 's/c: //g')"
 	UID_VCARD="ldap2vcard-$(cat ${FILE} | grep ^uid: | head -1 | perl -p -e 's/uid: //g')-$(cat ${FILE} | grep uidNumber: | perl -p -e 's/uidNumber: //g')"
 	ROLE=$(cat ${FILE} | grep ^apple-departmentNumber: | perl -p -e 's/departmentNumber: //g')
+	JPEGPHOTO=$(cat ${FILE} | grep ^jpegPhoto:: | perl -p -e 's/jpegPhoto:: //g')
 
 	# Begining vCard
 	echo "BEGIN:VCARD" >> ${PATH_EXPORT_VCARD}/${DATANAME}
@@ -531,6 +540,8 @@ do
 	do
 		echo "IMPP;ENCODING=8BIT;X-SERVICE-TYPE=gadugadu:x-apple;CHARSET=UTF-8:${gadugadu}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	done
+	# Processing photo
+	echo "PHOTO;TYPE=JPEG;ENCODING=b:${JPEGPHOTO}" >> ${PATH_EXPORT_VCARD}/${DATANAME}
 	# Processing categories
 	CATEGORIES=$(cat ${FILE} | grep '^memberOf' | perl -p -e 's/memberOf: //g' | perl -p -e 's/\n/,/g')
 	[[ ! -z ${CATEGORIES} ]] && echo "CATEGORIES;ENCODING=8BIT;CHARSET=UTF-8:$(echo ${CATEGORIES} | awk 'sub( ".$", "" )')" >> ${PATH_EXPORT_VCARD}/${DATANAME}

@@ -10,10 +10,13 @@ Versions
 
 \! Known issue / missing feature
 
+#### 1.0
+------------
+\+ Add jpegPhoto export from LDAP
+
 #### α 0.7
 ------------
 \* Correction to support LDIF splitted lines, thanks to Guillaume Bougard (gbougard@pkg.fr)
-
 
 #### α 0.6
 ------------
