@@ -380,7 +380,7 @@ if [[ ${GROUP_LIMIT} != "0" ]]
 					OLDIFS=$IFS; IFS=$'\n'
 					for LINE in $(cat ${GROUP_NAME})
 					do
-						base64decode ${LINE} | grep ^apple-group-realname: | awk '{print $2}' >> ${GROUP_NAME_CLEAN}
+						base64decode ${LINE} | grep ^apple-group-realname: | perl -p -e 's/apple-group-realname: //g' >> ${GROUP_NAME_CLEAN}
 					done
 					IFS=$OLDIFS
 					GROUP_FULL_NAME=$(cat ${GROUP_NAME_CLEAN})
