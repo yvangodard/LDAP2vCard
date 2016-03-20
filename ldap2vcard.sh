@@ -393,6 +393,7 @@ do
 		else
 			base64decode ${LINE} >> ${DIR_TEMP_USERS}/${USER}
 		fi
+	done
 	IFS=$OLDIFS
 	rm ${CONTENT_USER}
 done
