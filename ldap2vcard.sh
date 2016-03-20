@@ -33,6 +33,7 @@ LIST_GROUPS=$(mktemp /tmp/LDAP2vCard_group_list.XXXXX)
 LIST_USERS=$(mktemp /tmp/LDAP2vCard_users_list.XXXXX)
 LIST_USERS_CLEAN=$(mktemp /tmp/LDAP2vCard_users_list_clean.XXXXX)
 LIST_GROUP_MEMBERS=$(mktemp /tmp/LDAP2vCard_group_members.XXXXX)
+LIST_GROUP_MEMBERS_CLEAN=$(mktemp /tmp/LDAP2vCard_group_members_clean.XXXXX)
 DIR_TEMP_USERS=/tmp/LDAP2vCardUsers
 LDAP_URL="ldap://127.0.0.1"
 LDAP_DN_USER_BRANCH="cn=users"
@@ -328,45 +329,73 @@ if [[ ${GROUP_LIMIT} != "0" ]]
 	echo -e "$(cat ${LIST_GROUPS} | perl -p -e 's/\n/ - /g' | awk 'sub( "...$", "" )')\n"
 	for GROUP in $(cat ${LIST_GROUPS})
 	do
-	CONTENT_GROUP=$(mktemp /tmp/LDAP2vCard_group_content.XXXXX)
-	${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} > /dev/null 2>&1
-	if [ $? -ne 0 ]
-		then 
-		echo -e "-> Error binding wth group '${GROUP}' (cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE}).\n\tPlease verify this group exists on LDAP."
-	elif [[ ${LDAP_GROUP_OBJECTCLASS} = "groupOfNames" ]] 
-		then
-		echo -e "-> Processing group '${GROUP}'"
-		if [[ -z $(${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} member | grep member: | awk '{print $2}' | awk -F',' '{print $1}' | awk -F'=' '{print $2}') ]] 
+		CONTENT_GROUP=$(mktemp /tmp/LDAP2vCard_group_content.XXXXX)
+		CONTENT_GROUP_CLEAN=$(mktemp /tmp/LDAP2vCard_group_content_clean.XXXXX)
+		${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} > /dev/null 2>&1
+		if [ $? -ne 0 ]
 			then 
-			echo -e "\tUser list on LDAP group is empty"
-		else
-			${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} member | grep member: | awk '{print $2}' | awk -F',' '{print $1}' | awk -F'=' '{print $2}' >> ${CONTENT_GROUP}
-		fi
-	elif [[ ${LDAP_GROUP_OBJECTCLASS} = "posixGroup" ]]
-		then
-		echo -e "-> Processing group '${GROUP}'"
-		if [[ -z $(${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} memberUid | grep memberUid: | awk '{print $2}') ]] 
-			then 
-			echo -e "\tUser list on LDAP group is empty"
-		else
-			${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} memberUid | grep memberUid: | awk '{print $2}' >> ${CONTENT_GROUP}
-		fi
-	fi
-	if [ -f ${CONTENT_GROUP} ] && [[ ! -z $(cat ${CONTENT_GROUP}) ]]
-		then
-		cat ${CONTENT_GROUP} >> ${LIST_USERS}
-		GROUP_FULL_NAME=""
-		if [[ ${LDAP_GROUP_OBJECTCLASS} = "posixGroup" ]] && [[ ! -z $(${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} apple-group-realname | grep apple-group-realname: ) ]]
+			echo -e "-> Error binding wth group '${GROUP}' (cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE}).\n\tPlease verify this group exists on LDAP."
+		elif [[ ${LDAP_GROUP_OBJECTCLASS} = "groupOfNames" ]] 
 			then
-			GROUP_FULL_NAME=$(${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} apple-group-realname | grep apple-group-realname: | awk 'sub( "^......................", "")')
-			echo "   ...Group full name: ${GROUP_FULL_NAME}"
+			echo -e "-> Processing group '${GROUP}'"
+			if [[ -z $(${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} member | grep ^member: ) ]] 
+				then 
+				echo -e "\tUser list on LDAP group is empty"
+			else
+				${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} member >> ${CONTENT_GROUP}
+				deleteLineBreaks ${CONTENT_GROUP}
+				OLDIFS=$IFS; IFS=$'\n'
+				for LINE in $(cat ${CONTENT_GROUP})
+				do
+					base64decode ${LINE} | grep ^member: | awk '{print $2}' | awk -F',' '{print $1}' | awk -F'=' '{print $2}' >> ${CONTENT_GROUP_CLEAN}
+				done
+				IFS=$OLDIFS
+			fi
+		elif [[ ${LDAP_GROUP_OBJECTCLASS} = "posixGroup" ]]
+			then
+			echo -e "-> Processing group '${GROUP}'"
+			if [[ -z $(${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} memberUid | grep ^memberUid: ) ]] 
+				then 
+				echo -e "\tUser list on LDAP group is empty"
+			else
+				${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} memberUid >> ${CONTENT_GROUP}
+				deleteLineBreaks ${CONTENT_GROUP}
+				OLDIFS=$IFS; IFS=$'\n'
+				for LINE in $(cat ${CONTENT_GROUP})
+				do
+					base64decode ${LINE} | grep ^memberUid: | awk '{print $2}' >> ${CONTENT_GROUP_CLEAN}
+				done
+				IFS=$OLDIFS
+			fi
 		fi
-		for CONTENT_GROUP_USER in $(cat ${CONTENT_GROUP})
-		do
-			echo "${CONTENT_GROUP_USER} ${GROUP} $(echo ${GROUP_FULL_NAME} | perl -p -e 's/ /%%%/g')" >> ${LIST_GROUP_MEMBERS}
-		done
-	fi
-	rm ${CONTENT_GROUP}
+		if [ -f ${CONTENT_GROUP_CLEAN} ] && [[ ! -z $(cat ${CONTENT_GROUP_CLEAN}) ]]; then
+			cat ${CONTENT_GROUP_CLEAN} >> ${LIST_USERS}
+			GROUP_FULL_NAME=""
+			if [[ ${LDAP_GROUP_OBJECTCLASS} = "posixGroup" ]]; then
+				if [[ ! -z $(${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} apple-group-realname | grep ^apple-group-realname: ) ]]; then
+					GROUP_NAME=$(mktemp /tmp/LDAP2vCard_group_name.XXXXX)
+					GROUP_NAME_CLEAN=$(mktemp /tmp/LDAP2vCard_group_name_clean.XXXXX)
+					${LDAP_COMMAND_BEGIN} -b cn=${GROUP},${LDAP_GROUP_DN},${LDAP_DN_BASE} apple-group-realname >> ${GROUP_NAME}
+					deleteLineBreaks ${GROUP_NAME}
+					OLDIFS=$IFS; IFS=$'\n'
+					for LINE in $(cat ${GROUP_NAME})
+					do
+						base64decode ${LINE} | grep ^apple-group-realname: | awk '{print $2}' >> ${GROUP_NAME_CLEAN}
+					done
+					IFS=$OLDIFS
+					GROUP_FULL_NAME=$(cat ${GROUP_NAME_CLEAN})
+					echo "   ...Group full name: ${GROUP_FULL_NAME}"
+					rm ${GROUP_NAME_CLEAN}
+					rm ${GROUP_NAME}
+				fi
+			fi
+			for CONTENT_GROUP_USER in $(cat ${CONTENT_GROUP_CLEAN})
+			do
+				echo "${CONTENT_GROUP_USER} ${GROUP} $(echo ${GROUP_FULL_NAME} | perl -p -e 's/ /%%%/g')" >> ${LIST_GROUP_MEMBERS}
+			done
+		fi
+		rm ${CONTENT_GROUP}
+		rm ${CONTENT_GROUP_CLEAN}
 	done
 fi
 
